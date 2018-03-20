@@ -1,5 +1,6 @@
 const bodyParser = require('body-parser');
 const express = require('express');
+// A session is a place to store data that you want access to across requests.
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 
@@ -29,10 +30,15 @@ const sendUserError = (err, res) => {
 // TODO: implement routes
 
 // TODO: add local middleware to this route to ensure the user is logged in
-server.get('/me', (req, res) => {
-  // Do NOT modify this route handler in any way.
-  res.json(req.user);
-});
+server.use(
+  session({
+    secret: 'asdasdqweasdfkjh1l2k319237ajoshjdjlhlkh',
+    resave: true,
+    saveUninitialized: false,
+  }),
+);
+
+
 
 server.post('/users', (req, res) => {
   const userInfo = req.body; // body parser?
@@ -68,6 +74,9 @@ server.post('/log-in', (req, res) => {
       console.log(savedUser); // array with the one item
       bcrypt.compare(userInfo.passwordHash, savedUser[0].passwordHash, (err, response) => {
         if (response) {
+          req.session.loggedIn = savedUser[0]._id;
+          console.log('req.session', req.session);
+          console.log('user id', savedUser)
           res
             .status(200)
             .json({ success: true });
@@ -84,5 +93,26 @@ server.post('/log-in', (req, res) => {
         .json({ MESSAGE: 'There was an error logging in' });
     })
 })
+
+const auth = (req, res, next) => {
+  console.log(req.session);
+  if(req.session.loggedIn) {
+    User.findById(req.session.loggedIn)
+      .then(user => {
+        req.user = user;
+        next();
+      })
+      .catch(err => {
+        console.error(err);
+      });
+  } else {
+    res.status(STATUS_USER_ERROR).send({ message: 'You are not logged in'});
+  }
+};
+
+server.get('/me', auth, (req, res) => {
+  // Do NOT modify this route handler in any way.
+  res.json(req.user);
+});
 
 module.exports = { server };
